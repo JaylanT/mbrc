@@ -1,24 +1,25 @@
 package com.kelsos.mbrc.ui.navigation.library.genres
 
+import android.arch.paging.PagedList
 import android.os.Bundle
+import android.support.constraint.Group
 import android.support.design.widget.Snackbar
 import android.support.v4.app.Fragment
+import android.support.v4.widget.SwipeRefreshLayout
 import android.support.v4.widget.SwipeRefreshLayout.OnRefreshListener
+import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import com.kelsos.mbrc.R
-import com.kelsos.mbrc.content.library.genres.Genre
+import com.kelsos.mbrc.content.library.genres.GenreEntity
 import com.kelsos.mbrc.extensions.fail
 import com.kelsos.mbrc.extensions.initLinear
 import com.kelsos.mbrc.ui.navigation.library.PopupActionHandler
 import com.kelsos.mbrc.ui.navigation.library.genres.GenreEntryAdapter.MenuItemSelectedListener
-import com.kelsos.mbrc.ui.widgets.EmptyRecyclerView
-import com.kelsos.mbrc.ui.widgets.MultiSwipeRefreshLayout
 import com.kelsos.mbrc.ui.widgets.RecyclerViewFastScroller
 import kotterknife.bindView
 import toothpick.Toothpick
@@ -29,15 +30,15 @@ class BrowseGenreFragment : Fragment(),
     MenuItemSelectedListener,
     OnRefreshListener {
 
-  private val recycler: EmptyRecyclerView by bindView(R.id.library_data_list)
-  private val swipeLayout: MultiSwipeRefreshLayout by bindView(R.id.swipe_layout)
+  private val recycler: RecyclerView by bindView(R.id.library_browser__content)
+  private val swipeLayout: SwipeRefreshLayout by bindView(R.id.library_browser__refresh_layout)
   private val fastScroller: RecyclerViewFastScroller by bindView(R.id.fastscroller)
 
-  private val emptyView: View by bindView(R.id.empty_view)
-  private val emptyViewTitle: TextView by bindView(R.id.list_empty_title)
-  private val emptyViewIcon: ImageView by bindView(R.id.list_empty_icon)
-  private val emptyViewSubTitle: TextView by bindView(R.id.list_empty_subtitle)
-  private val emptyViewProgress: ProgressBar by bindView(R.id.empty_view_progress_bar)
+  private val emptyView: Group by bindView(R.id.library_browser__empty_group)
+  private val emptyViewTitle: TextView by bindView(R.id.library_browser__text_title)
+  private val emptyViewIcon: ImageView by bindView(R.id.library_browser__empty_icon)
+  private val emptyViewSubTitle: TextView by bindView(R.id.library_browser__text_subtitle)
+  private val emptyViewProgress: ProgressBar by bindView(R.id.library_browser__loading_bar)
 
   @Inject lateinit var adapter: GenreEntryAdapter
   @Inject lateinit var actionHandler: PopupActionHandler
@@ -62,30 +63,30 @@ class BrowseGenreFragment : Fragment(),
     presenter.detach()
   }
 
-  override fun update(cursor: List<Genre>) {
+  override fun update(pagedList: PagedList<GenreEntity>) {
     swipeLayout.isRefreshing = false
-    adapter.update(cursor)
+    adapter.setList(pagedList)
   }
 
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
-    swipeLayout.setSwipeableChildren(R.id.library_data_list, R.id.empty_view)
+
     emptyViewTitle.setText(R.string.genres_list_empty)
     swipeLayout.setOnRefreshListener(this)
-    recycler.initLinear(adapter, emptyView, fastScroller)
+    recycler.initLinear(adapter, fastScroller)
     recycler.setHasFixedSize(true)
     adapter.setMenuItemSelectedListener(this)
     presenter.attach(this)
     presenter.load()
   }
 
-  override fun onMenuItemSelected(menuItem: MenuItem, entry: Genre): Boolean {
+  override fun onMenuItemSelected(action: String, entry: GenreEntity): Boolean {
     val activity = activity ?: fail("null activity")
-    actionHandler.genreSelected(menuItem, entry, activity)
+    actionHandler.genreSelected(action, entry, activity)
     return true
   }
 
-  override fun onItemClicked(genre: Genre) {
+  override fun onItemClicked(genre: GenreEntity) {
     val activity = activity ?: fail("null activity")
     actionHandler.genreSelected(genre, activity)
   }

@@ -1,24 +1,29 @@
 package com.kelsos.mbrc.ui.navigation.library.genres
 
-import com.kelsos.mbrc.content.library.genres.Genre
+import android.arch.lifecycle.LiveData
+import android.arch.lifecycle.Observer
+import android.arch.paging.DataSource
+import android.arch.paging.PagedList
+import com.kelsos.mbrc.content.library.genres.GenreEntity
 import com.kelsos.mbrc.content.library.genres.GenreRepository
 import com.kelsos.mbrc.events.LibraryRefreshCompleteEvent
 import com.kelsos.mbrc.events.bus.RxBus
 import com.kelsos.mbrc.mvp.BasePresenter
 import com.kelsos.mbrc.utilities.SchedulerProvider
-import io.reactivex.Single
+import com.kelsos.mbrc.utilities.paged
 import timber.log.Timber
 import javax.inject.Inject
 
 class BrowseGenrePresenterImpl
-@Inject constructor(
+@Inject
+constructor(
     private val bus: RxBus,
     private val repository: GenreRepository,
     private val schedulerProvider: SchedulerProvider
-) :
-    BasePresenter<BrowseGenreView>(),
+) : BasePresenter<BrowseGenreView>(),
     BrowseGenrePresenter {
 
+  private lateinit var genres: LiveData<PagedList<GenreEntity>>
 
   override fun attach(view: BrowseGenreView) {
     super.attach(view)
@@ -32,31 +37,46 @@ class BrowseGenrePresenterImpl
 
   override fun load() {
     view().showLoading()
-    addDisposable(repository.getAllCursor().compose { schedule(it) }.subscribe({
-      view().update(it)
-      view().hideLoading()
-    }, {
-      Timber.v(it, "Error while loading the data from the database")
-      view().failure(it)
-      view().hideLoading()
-    }))
+    addDisposable(repository.getAll()
+        .observeOn(schedulerProvider.main())
+        .subscribeOn(schedulerProvider.io())
+        .subscribe({
+          onGenresLoaded(it)
+          view().hideLoading()
+        }, {
+          Timber.v(it, "Error while loading the data from the database")
+          view().failure(it)
+          view().hideLoading()
+        }))
   }
 
+  private fun onGenresLoaded(it: DataSource.Factory<Int, GenreEntity>) {
+    if (::genres.isInitialized) {
+      genres.removeObservers(this)
+    }
+
+    genres = it.paged()
+    genres.observe(this, Observer {
+      if (it != null) {
+        view().update(it)
+      }
+    })
+  }
 
   override fun reload() {
     view().showLoading()
-    addDisposable(repository.getAndSaveRemote().compose { schedule(it) }.subscribe({
-      view().update(it)
-      view().hideLoading()
-    }, {
-      Timber.v(it, "Error while loading the data from the database")
-      view().failure(it)
-      view().hideLoading()
-    }))
+    addDisposable(repository.getAndSaveRemote()
+        .observeOn(schedulerProvider.main())
+        .subscribeOn(schedulerProvider.io())
+        .subscribe({
+          onGenresLoaded(it)
+          view().hideLoading()
+        }, {
+          Timber.v(it, "Error while loading the data from the database")
+          view().failure(it)
+          view().hideLoading()
+        }))
   }
-
-  private fun schedule(it: Single<List<Genre>>) = it.observeOn(schedulerProvider.main())
-      .subscribeOn(schedulerProvider.io())
 
 }
 

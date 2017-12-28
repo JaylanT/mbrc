@@ -1,6 +1,7 @@
 package com.kelsos.mbrc.ui.navigation.library.genres
 
-import com.kelsos.mbrc.content.library.genres.Genre
+import android.arch.paging.PagedList
+import com.kelsos.mbrc.content.library.genres.GenreEntity
 import com.kelsos.mbrc.mvp.BaseView
 import com.kelsos.mbrc.mvp.Presenter
 
@@ -10,7 +11,7 @@ interface BrowseGenrePresenter : Presenter<BrowseGenreView> {
 }
 
 interface BrowseGenreView : BaseView {
-  fun update(cursor: List<Genre>)
+  fun update(pagedList: PagedList<GenreEntity>)
   fun failure(it: Throwable)
   fun hideLoading()
   fun showLoading()

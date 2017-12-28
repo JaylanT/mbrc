@@ -1,87 +1,73 @@
 package com.kelsos.mbrc.networking.connections
 
+import android.arch.lifecycle.LiveData
 import android.content.SharedPreferences
 import android.content.res.Resources
-
 import com.kelsos.mbrc.R
-import com.raizlabs.android.dbflow.kotlinextensions.delete
-import com.raizlabs.android.dbflow.kotlinextensions.save
-import com.raizlabs.android.dbflow.kotlinextensions.update
-import com.raizlabs.android.dbflow.sql.language.SQLite
-
+import com.kelsos.mbrc.ui.connectionmanager.ConnectionModel
+import io.reactivex.Single
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.async
 import javax.inject.Inject
 
 class ConnectionRepositoryImpl
-@Inject constructor(
+@Inject
+constructor(
+    private val connectionDao: ConnectionDao,
     private val preferences: SharedPreferences,
     private val resources: Resources
 ) : ConnectionRepository {
 
-  override fun save(settings: ConnectionSettings) {
-    settings.save()
-
-    if (count() == 1L) {
-      default = last
-    }
-  }
-
-  override fun delete(settings: ConnectionSettings) {
-    val oldId = settings.id
-
-    settings.delete()
-
-    if (oldId != defaultId) {
-      return
-    }
-
-    val count = count()
-    if (count == 0L) {
-      defaultId = -1
-    } else {
-      val before = getItemBefore(oldId)
-      if (before != null) {
-        default = before
+  override fun save(settings: ConnectionSettingsEntity) {
+    async(CommonPool) {
+      if (settings.id > 0) {
+        connectionDao.update(settings)
       } else {
-        default = first
+        connectionDao.insert(settings)
+      }
+
+      if (count() == 1L) {
+        default = last
       }
     }
   }
 
-  private fun getItemBefore(id: Long): ConnectionSettings? {
-    return SQLite.select()
-        .from(ConnectionSettings::class.java)
-        .where(ConnectionSettings_Table.id.lessThan(id))
-        .orderBy(ConnectionSettings_Table.id, false)
-        .querySingle()
+  override fun delete(settings: ConnectionSettingsEntity) {
+    async(CommonPool) {
+      val oldId = settings.id
+
+      connectionDao.delete(settings)
+
+      if (oldId == defaultId) {
+        val count = count()
+        if (count == 0L) {
+          defaultId = -1
+        } else {
+          val before = getItemBefore(oldId)
+          default = before ?: first
+        }
+      }
+    }
   }
 
-  private val first: ConnectionSettings?
-    get() = SQLite.select()
-        .from(ConnectionSettings::class.java)
-        .orderBy(ConnectionSettings_Table.id, true)
-        .querySingle()
-
-  private val last: ConnectionSettings?
-    get() = SQLite.select()
-        .from(ConnectionSettings::class.java)
-        .orderBy(ConnectionSettings_Table.id, false)
-        .querySingle()
-
-  override fun update(settings: ConnectionSettings) {
-    settings.update()
+  private fun getItemBefore(id: Long): ConnectionSettingsEntity? {
+    return connectionDao.getPrevious(id)
   }
 
-  override var default: ConnectionSettings?
+  private val first: ConnectionSettingsEntity?
+    get() = connectionDao.first()
+
+  private val last: ConnectionSettingsEntity?
+    get() = connectionDao.last()
+
+  override var default: ConnectionSettingsEntity?
     get() {
       val defaultId = defaultId
       if (defaultId < 0) {
         return null
       }
 
-      return SQLite.select()
-          .from(ConnectionSettings::class.java)
-          .where(ConnectionSettings_Table.id.`is`(defaultId))
-          .querySingle()
+      return connectionDao.findById(defaultId)
     }
     set(settings) {
       if (settings == null) {
@@ -101,11 +87,14 @@ class ConnectionRepositoryImpl
       this.preferences.edit().putLong(key, id).apply()
     }
 
-  override val all: List<ConnectionSettings>
-    get() = SQLite.select().from(ConnectionSettings::class.java).queryList()
+  override fun getModel(): Single<ConnectionModel> = Single.fromCallable {
+    return@fromCallable ConnectionModel(defaultId, getAll())
+  }
+
+  override fun getAll(): LiveData<List<ConnectionSettingsEntity>> = connectionDao.getAll()
 
   override fun count(): Long {
-    return SQLite.selectCountOf().from(ConnectionSettings::class.java).longValue()
+    return connectionDao.count()
   }
 
 }

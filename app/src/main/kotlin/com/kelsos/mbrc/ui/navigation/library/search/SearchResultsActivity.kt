@@ -1,20 +1,20 @@
 package com.kelsos.mbrc.ui.navigation.library.search
 
 import android.os.Bundle
+import android.support.constraint.Group
 import android.support.v7.widget.LinearLayoutManager
-import android.text.TextUtils
+import android.support.v7.widget.RecyclerView
 import android.view.MenuItem
-import android.widget.LinearLayout
-import android.widget.TextView
 import com.kelsos.mbrc.R
-import com.kelsos.mbrc.content.library.albums.Album
-import com.kelsos.mbrc.content.library.artists.Artist
-import com.kelsos.mbrc.content.library.genres.Genre
-import com.kelsos.mbrc.content.library.tracks.Track
+import com.kelsos.mbrc.content.library.albums.AlbumEntity
+import com.kelsos.mbrc.content.library.artists.ArtistEntity
+import com.kelsos.mbrc.content.library.genres.GenreEntity
+import com.kelsos.mbrc.content.library.tracks.TrackEntity
+import com.kelsos.mbrc.extensions.gone
+import com.kelsos.mbrc.extensions.show
 import com.kelsos.mbrc.ui.activities.BaseActivity
 import com.kelsos.mbrc.ui.navigation.library.PopupActionHandler
 import com.kelsos.mbrc.ui.navigation.library.search.SearchResultAdapter.OnSearchItemSelected
-import com.kelsos.mbrc.ui.widgets.EmptyRecyclerView
 import kotterknife.bindView
 import toothpick.Scope
 import toothpick.Toothpick
@@ -22,12 +22,11 @@ import toothpick.smoothie.module.SmoothieActivityModule
 import javax.inject.Inject
 
 class SearchResultsActivity : BaseActivity(),
-                              SearchResultsView,
-                              OnSearchItemSelected {
+    SearchResultsView,
+    OnSearchItemSelected {
 
-  private val searchResultsRecycler: EmptyRecyclerView by bindView(R.id.search_results_recycler)
-  private val emptyViewText: TextView by bindView(R.id.empty_view_text)
-  private val emptyView: LinearLayout by bindView(R.id.empty_view)
+  private val searchResultsRecycler: RecyclerView by bindView(R.id.content_search__search_results)
+  private val emptyView: Group by bindView(R.id.content_search__empty_group)
 
   @Inject lateinit var adapter: SearchResultAdapter
   @Inject lateinit var presenter: SearchResultsPresenter
@@ -42,12 +41,11 @@ class SearchResultsActivity : BaseActivity(),
     Toothpick.inject(this, scope)
     setContentView(R.layout.activity_search_results)
 
-
     val query = intent.getStringExtra(QUERY)
 
     presenter.attach(this)
 
-    if (TextUtils.isEmpty(query)) {
+    if (query.isNullOrBlank()) {
       finish()
     } else {
       presenter.search(query)
@@ -56,14 +54,16 @@ class SearchResultsActivity : BaseActivity(),
     setupToolbar(query)
 
     searchResultsRecycler.adapter = adapter
-    searchResultsRecycler.emptyView = emptyView
     searchResultsRecycler.layoutManager = LinearLayoutManager(this)
     adapter.setOnSearchItemSelectedListener(this)
-    emptyViewText.setText(R.string.no_results_found)
-
   }
 
   override fun update(searchResults: SearchResults) {
+    if (searchResults.empty()) {
+      emptyView.show()
+    } else {
+      emptyView.gone()
+    }
     adapter.update(searchResults)
   }
 
@@ -73,43 +73,43 @@ class SearchResultsActivity : BaseActivity(),
     super.onDestroy()
   }
 
-  override fun onOptionsItemSelected(item: MenuItem): Boolean {
-    if (item.itemId == android.R.id.home) {
+  override fun onOptionsItemSelected(item: MenuItem): Boolean = when {
+    item.itemId == android.R.id.home -> {
       finish()
-      return true
+      true
     }
-    return super.onOptionsItemSelected(item)
+    else -> super.onOptionsItemSelected(item)
   }
 
-  override fun albumSelected(item: MenuItem, album: Album) {
-    actionHandler.albumSelected(item, album, this)
+  override fun albumSelected(action: String, album: AlbumEntity) {
+    actionHandler.albumSelected(action, album, this)
   }
 
-  override fun albumSelected(album: Album) {
+  override fun albumSelected(album: AlbumEntity) {
     actionHandler.albumSelected(album, this)
   }
 
-  override fun artistSelected(item: MenuItem, artist: Artist) {
-    actionHandler.artistSelected(item, artist, this)
+  override fun artistSelected(action: String, artist: ArtistEntity) {
+    actionHandler.artistSelected(action, artist, this)
   }
 
-  override fun artistSelected(artist: Artist) {
+  override fun artistSelected(artist: ArtistEntity) {
     actionHandler.artistSelected(artist, this)
   }
 
-  override fun genreSelected(item: MenuItem, genre: Genre) {
-    actionHandler.genreSelected(item, genre, this)
+  override fun genreSelected(action: String, genre: GenreEntity) {
+    actionHandler.genreSelected(action, genre, this)
   }
 
-  override fun genreSelected(genre: Genre) {
+  override fun genreSelected(genre: GenreEntity) {
     actionHandler.genreSelected(genre, this)
   }
 
-  override fun trackSelected(item: MenuItem, track: Track) {
-    actionHandler.trackSelected(item, track)
+  override fun trackSelected(action: String, track: TrackEntity) {
+    actionHandler.trackSelected(action, track)
   }
 
-  override fun trackSelected(track: Track) {
+  override fun trackSelected(track: TrackEntity) {
     actionHandler.trackSelected(track)
   }
 

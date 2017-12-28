@@ -1,6 +1,5 @@
 package com.kelsos.mbrc.ui.connectionmanager
 
-import android.support.v4.content.ContextCompat
 import android.support.v7.widget.PopupMenu
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
@@ -9,12 +8,14 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import com.kelsos.mbrc.R
-import com.kelsos.mbrc.networking.connections.ConnectionSettings
+import com.kelsos.mbrc.extensions.gone
+import com.kelsos.mbrc.extensions.show
+import com.kelsos.mbrc.networking.connections.ConnectionSettingsEntity
 import kotterknife.bindView
 import java.util.*
 
 class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ConnectionViewHolder>() {
-  private val data: MutableList<ConnectionSettings>
+  private val data: MutableList<ConnectionSettingsEntity>
   private var selectionId: Long = 0
   private var changeListener: ConnectionChangeListener? = null
 
@@ -32,22 +33,18 @@ class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ConnectionViewH
     this.changeListener = changeListener
   }
 
-  override fun getItemId(position: Int): Long {
-    return data[0].id
-  }
+  override fun getItemId(position: Int): Long = data[0].id
 
   override fun onCreateViewHolder(viewGroup: ViewGroup, position: Int): ConnectionViewHolder {
-    val inflater = LayoutInflater.from(viewGroup.context)
-    val view = inflater.inflate(R.layout.ui_list_connection_settings, viewGroup, false)
-    val holder = ConnectionViewHolder(view)
+    val holder = ConnectionViewHolder.create(viewGroup)
 
-    holder.overflow.setOnClickListener {
+    holder.onOverflow {
       val adapterPosition = holder.adapterPosition
       val settings = data[adapterPosition]
       showPopup(settings, it)
     }
 
-    holder.itemView.setOnClickListener {
+    holder.onClick {
       val adapterPosition = holder.adapterPosition
       val settings = data[adapterPosition]
       changeListener?.onDefault(settings)
@@ -56,22 +53,10 @@ class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ConnectionViewH
   }
 
   override fun onBindViewHolder(holder: ConnectionViewHolder, position: Int) {
-    val settings = data[position]
-    holder.computerName.text = settings.name
-    holder.hostname.text = settings.address
-    holder.portNum.text = settings.port.toString()
-
-    if (settings.id == selectionId) {
-      holder.defaultSettings.visibility = View.VISIBLE
-      val grey = ContextCompat.getColor(holder.itemView.context, R.color.button_dark)
-      holder.defaultSettings.setImageResource(R.drawable.ic_check_black_24dp)
-      holder.defaultSettings.setColorFilter(grey)
-    } else {
-      holder.defaultSettings.visibility = View.INVISIBLE
-    }
+    holder.bind(data[position], selectionId)
   }
 
-  private fun showPopup(settings: ConnectionSettings, v: View) {
+  private fun showPopup(settings: ConnectionSettingsEntity, v: View) {
     val popupMenu = PopupMenu(v.context, v)
     popupMenu.menuInflater.inflate(R.menu.connection_popup, popupMenu.menu)
     popupMenu.setOnMenuItemClickListener {
@@ -91,31 +76,54 @@ class ConnectionAdapter : RecyclerView.Adapter<ConnectionAdapter.ConnectionViewH
     popupMenu.show()
   }
 
-  override fun getItemCount(): Int {
-    return data.size
-  }
+  override fun getItemCount(): Int = data.size
 
-  fun update(connectionModel: ConnectionModel) {
+  fun updateData(data: List<ConnectionSettingsEntity>) {
     this.data.clear()
-    this.data.addAll(connectionModel.settings)
-    selectionId = connectionModel.defaultId
+    this.data.addAll(data)
     notifyDataSetChanged()
   }
 
-  inner class ConnectionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-    val hostname: TextView by bindView(R.id.cs_list_host)
-    val portNum: TextView by bindView(R.id.cs_list_port)
-    val computerName: TextView by bindView(R.id.cs_list_name)
-    val defaultSettings: ImageView by bindView(R.id.cs_list_default)
-    val overflow: View by bindView(R.id.cs_list_overflow)
+  class ConnectionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    private val hostname: TextView by bindView(R.id.connection_settings__hostname_and_port)
+    private val computerName: TextView by bindView(R.id.connection_settings__name)
+    private val defaultSettings: ImageView by bindView(R.id.connection_settings__default_indicator)
+    private val overflow: View by bindView(R.id.connection_settings__overflow)
 
+    fun bind(entity: ConnectionSettingsEntity, selectionId: Long) {
+      computerName.text = entity.name
+      hostname.text = "${entity.address} : ${entity.port}"
+
+      if (entity.id == selectionId) {
+        defaultSettings.show()
+      } else {
+        defaultSettings.gone()
+      }
+    }
+
+    fun onOverflow(action: (view: View) -> Unit) {
+      overflow.setOnClickListener { action(it) }
+    }
+
+    fun onClick(action: () -> Unit) {
+      itemView.setOnClickListener { action() }
+    }
+
+    companion object {
+      fun create(parent: ViewGroup): ConnectionViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        val view = inflater.inflate(R.layout.ui_list_connection_settings, parent, false)
+        return ConnectionViewHolder(view)
+      }
+    }
   }
 
   interface ConnectionChangeListener {
-    fun onDelete(settings: ConnectionSettings)
+    fun onDelete(settings: ConnectionSettingsEntity)
 
-    fun onEdit(settings: ConnectionSettings)
+    fun onEdit(settings: ConnectionSettingsEntity)
 
-    fun onDefault(settings: ConnectionSettings)
+    fun onDefault(settings: ConnectionSettingsEntity)
   }
+
 }

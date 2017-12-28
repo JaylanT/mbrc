@@ -4,25 +4,28 @@ import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
+import android.support.v4.app.FragmentManager
 import android.support.v7.app.AlertDialog
 import android.text.TextUtils
 import android.widget.EditText
 import com.kelsos.mbrc.R
 import com.kelsos.mbrc.extensions.fail
-import com.kelsos.mbrc.networking.connections.ConnectionSettings
+import com.kelsos.mbrc.networking.connections.ConnectionSettingsEntity
 import kotterknife.bindView
 
 class SettingsDialogFragment : DialogFragment() {
 
-  private val hostEdit: EditText by bindView(R.id.settings_dialog_host)
-  private val nameEdit: EditText by bindView(R.id.settings_dialog_name)
-  private val portEdit: EditText by bindView(R.id.settings_dialog_port)
+  private val hostEdit: EditText by bindView(R.id.settings_dialog__hostname_edit)
+  private val nameEdit: EditText by bindView(R.id.settings_dialog__name_edit)
+  private val portEdit: EditText by bindView(R.id.settings_dialog__port_edit)
 
   private var mListener: SettingsSaveListener? = null
-  private lateinit var settings: ConnectionSettings
+  private lateinit var settings: ConnectionSettingsEntity
   private var edit: Boolean = false
 
-  private fun setConnectionSettings(settings: ConnectionSettings) {
+  private lateinit var fm: FragmentManager
+
+  private fun setConnectionSettings(settings: ConnectionSettingsEntity) {
     this.settings = settings
   }
 
@@ -88,15 +91,19 @@ class SettingsDialogFragment : DialogFragment() {
     true
   }
 
+  fun show() {
+    show(fm, "settings_dialog")
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     if (!edit) {
-      settings = ConnectionSettings()
+      settings = ConnectionSettingsEntity()
     }
   }
 
   interface SettingsSaveListener {
-    fun onSave(settings: ConnectionSettings)
+    fun onSave(settings: ConnectionSettingsEntity)
   }
 
   companion object {
@@ -104,11 +111,17 @@ class SettingsDialogFragment : DialogFragment() {
     private val MAX_PORT = 65535
     private val MIN_PORT = 1
 
-    fun newInstance(settings: ConnectionSettings): SettingsDialogFragment {
+    fun newInstance(settings: ConnectionSettingsEntity, fm: FragmentManager): SettingsDialogFragment {
+
       val fragment = SettingsDialogFragment()
+      fragment.fm = fm
       fragment.setConnectionSettings(settings)
       fragment.edit = true
       return fragment
+    }
+
+    fun create(fm: FragmentManager): SettingsDialogFragment {
+      return SettingsDialogFragment().apply { this.fm = fm }
     }
   }
 }

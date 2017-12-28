@@ -1,15 +1,16 @@
 package com.kelsos.mbrc.ui.navigation.library.artistalbums
 
+import android.arch.paging.PagedList
 import android.os.Bundle
+import android.support.constraint.Group
 import android.support.v7.widget.LinearLayoutManager
+import android.support.v7.widget.RecyclerView
 import android.view.MenuItem
-import android.widget.LinearLayout
 import com.kelsos.mbrc.R
-import com.kelsos.mbrc.content.library.albums.Album
+import com.kelsos.mbrc.content.library.albums.AlbumEntity
 import com.kelsos.mbrc.ui.activities.BaseActivity
 import com.kelsos.mbrc.ui.navigation.library.PopupActionHandler
 import com.kelsos.mbrc.ui.navigation.library.albums.AlbumEntryAdapter
-import com.kelsos.mbrc.ui.widgets.EmptyRecyclerView
 import kotterknife.bindView
 import toothpick.Scope
 import toothpick.Toothpick
@@ -20,8 +21,8 @@ class ArtistAlbumsActivity : BaseActivity(),
     ArtistAlbumsView,
     AlbumEntryAdapter.MenuItemSelectedListener {
 
-  private val recyclerView: EmptyRecyclerView by bindView(R.id.album_recycler)
-  private val emptyView: LinearLayout by bindView(R.id.empty_view)
+  private val recyclerView: RecyclerView by bindView(R.id.artist_albums__album_list)
+  private val emptyView: Group by bindView(R.id.artist_albums__empty_view)
 
   @Inject lateinit var actionHandler: PopupActionHandler
   @Inject lateinit var adapter: AlbumEntryAdapter
@@ -32,8 +33,7 @@ class ArtistAlbumsActivity : BaseActivity(),
 
   public override fun onCreate(savedInstanceState: Bundle?) {
     scope = Toothpick.openScopes(application, this)
-    scope.installModules(SmoothieActivityModule(this),
-        ArtistAlbumsModule())
+    scope.installModules(SmoothieActivityModule(this), ArtistAlbumsModule())
     super.onCreate(savedInstanceState)
     Toothpick.inject(this, scope)
     setContentView(R.layout.activity_artist_albums)
@@ -54,7 +54,6 @@ class ArtistAlbumsActivity : BaseActivity(),
     adapter.setMenuItemSelectedListener(this)
     recyclerView.layoutManager = LinearLayoutManager(this)
     recyclerView.adapter = adapter
-    recyclerView.emptyView = emptyView
     presenter.attach(this)
     presenter.load(artist!!)
   }
@@ -70,16 +69,16 @@ class ArtistAlbumsActivity : BaseActivity(),
     return super.onOptionsItemSelected(item)
   }
 
-  override fun onMenuItemSelected(menuItem: MenuItem, entry: Album) {
-    actionHandler.albumSelected(menuItem, entry, this)
+  override fun onMenuItemSelected(action: String, entry: AlbumEntity) {
+    actionHandler.albumSelected(action, entry, this)
   }
 
-  override fun onItemClicked(album: Album) {
+  override fun onItemClicked(album: AlbumEntity) {
     actionHandler.albumSelected(album, this)
   }
 
-  override fun update(albums: List<Album>) {
-    adapter.update(albums)
+  override fun update(albums: PagedList<AlbumEntity>) {
+    adapter.setList(albums)
   }
 
   override fun onDestroy() {

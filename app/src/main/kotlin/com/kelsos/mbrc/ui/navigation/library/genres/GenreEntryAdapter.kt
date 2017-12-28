@@ -1,112 +1,72 @@
 package com.kelsos.mbrc.ui.navigation.library.genres
 
-import android.app.Activity
-import android.support.v7.widget.PopupMenu
+import android.arch.paging.PagedListAdapter
+import android.support.v7.recyclerview.extensions.DiffCallback
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.TextView
 import com.kelsos.mbrc.R
-import com.kelsos.mbrc.content.library.genres.Genre
+import com.kelsos.mbrc.content.library.genres.GenreEntity
+import com.kelsos.mbrc.content.nowplaying.queue.LibraryPopup
+import com.kelsos.mbrc.content.nowplaying.queue.LibraryPopup.Action
 import com.kelsos.mbrc.extensions.string
+import com.kelsos.mbrc.ui.navigation.library.popup
 import com.kelsos.mbrc.ui.widgets.RecyclerViewFastScroller.BubbleTextGetter
 import kotterknife.bindView
 import javax.inject.Inject
 
 class GenreEntryAdapter
 @Inject
-constructor(context: Activity) : RecyclerView.Adapter<GenreEntryAdapter.ViewHolder>(),
+constructor() : PagedListAdapter<GenreEntity, GenreEntryAdapter.ViewHolder>(DIFF_CALLBACK),
     BubbleTextGetter {
-  private var data: List<Genre>? = null
+
   private var listener: MenuItemSelectedListener? = null
-  private val inflater: LayoutInflater = LayoutInflater.from(context)
+  private val indicatorPressed: (View, Int) -> Unit = { view, position ->
+    view.popup(R.menu.popup_genre) {
+      val action = when (it) {
+        R.id.popup_genre_play -> LibraryPopup.NOW
+        R.id.popup_genre_artists -> LibraryPopup.PROFILE
+        R.id.popup_genre_queue_next -> LibraryPopup.NEXT
+        R.id.popup_genre_queue_last -> LibraryPopup.LAST
+        else -> throw IllegalArgumentException("invalid menuItem id $it")
+      }
+      val genreEntity = getItem(position)
+
+      genreEntity?.run {
+        listener?.onMenuItemSelected(action, this)
+      }
+    }
+  }
+
+  private val pressed: (View, Int) -> Unit = { _, position ->
+    val genreEntity = getItem(position)
+    genreEntity?.let {
+      listener?.onItemClicked(it)
+    }
+  }
 
   fun setMenuItemSelectedListener(listener: MenuItemSelectedListener) {
     this.listener = listener
   }
 
-  /**
-   * Called when RecyclerView needs a new [ViewHolder] of the given type to represent
-   * an item.
-   *
-   *
-   * This new ViewHolder should be constructed with a new View that can represent the items
-   * of the given type. You can either create a new View manually or inflate it from an XML
-   * layout file.
-   *
-   *
-   * The new ViewHolder will be used to display items of the adapter using
-   * [.onBindViewHolder]. Since it will be re-used to display different
-   * items in the data set, it is a good idea to cache references to sub views of the View to
-   * avoid unnecessary [View.findViewById] calls.
-
-   * @param parent The ViewGroup into which the new View will be added after it is bound to
-   * * an adapter position.
-   * *
-   * @param viewType The view type of the new View.
-   * *
-   * @return A new ViewHolder that holds a View of the given view type.
-   * *
-   * @see .getItemViewType
-   * @see .onBindViewHolder
-   */
   override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-    val view = inflater.inflate(R.layout.listitem_single, parent, false)
-    return ViewHolder(view)
+    return ViewHolder.create(parent, indicatorPressed, pressed)
   }
 
-  /**
-   * Called by RecyclerView to display the data at the specified position. This method
-   * should update the contents of the [ViewHolder.itemView] to reflect the item at
-   * the given position.
-   *
-   *
-   * Note that unlike [android.widget.ListView], RecyclerView will not call this
-   * method again if the position of the item changes in the data set unless the item itself
-   * is invalidated or the new position cannot be determined. For this reason, you should only
-   * use the `position` parameter while acquiring the related data item inside this
-   * method and should not keep a copy of it. If you need the position of an item later on
-   * (e.g. in a click listener), use [ViewHolder.getPosition] which will have the
-   * updated position.
-
-   * @param holder The ViewHolder which should be updated to represent the contents of the
-   * * item at the given position in the data set.
-   * *
-   * @param position The position of the item within the adapter's data set.
-   */
   override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-    val genre = data?.get(holder.adapterPosition)
-
-    genre?.let {
-      holder.title.text = if (it.genre.isNullOrBlank()) holder.empty else genre.genre
-      holder.indicator.setOnClickListener { createPopup(it, genre) }
-      holder.itemView.setOnClickListener { listener?.onItemClicked(genre) }
+    val genre = getItem(holder.adapterPosition)
+    if (genre != null) {
+      holder.bindTo(genre)
+    } else {
+      holder.clear()
     }
-
   }
-
-  private fun createPopup(it: View, genre: Genre) {
-    val popupMenu = PopupMenu(it.context, it)
-    popupMenu.inflate(R.menu.popup_genre)
-    popupMenu.setOnMenuItemClickListener { menuItem ->
-      return@setOnMenuItemClickListener listener?.onMenuItemSelected(menuItem, genre) ?: false
-
-    }
-    popupMenu.show()
-  }
-
-  /**
-   * Returns the total number of items in the data set hold by the adapter.
-
-   * @return The total number of items in this adapter.
-   */
-  override fun getItemCount(): Int = data?.size ?: 0
 
   override fun getTextToShowInBubble(pos: Int): String {
-    val genre = data?.get(pos)?.genre
+    val genre = getItem(pos)?.genre
     genre?.let {
       if (it.isNotBlank()) {
         return it.substring(0, 1)
@@ -116,20 +76,56 @@ constructor(context: Activity) : RecyclerView.Adapter<GenreEntryAdapter.ViewHold
     return "-"
   }
 
+  companion object {
+    val DIFF_CALLBACK = object : DiffCallback<GenreEntity>() {
+      override fun areItemsTheSame(oldItem: GenreEntity, newItem: GenreEntity): Boolean {
+        return oldItem.id == newItem.id
+      }
+
+      override fun areContentsTheSame(oldItem: GenreEntity, newItem: GenreEntity): Boolean {
+        return oldItem == newItem
+      }
+    }
+  }
+
   interface MenuItemSelectedListener {
-    fun onMenuItemSelected(menuItem: MenuItem, entry: Genre): Boolean
+    fun onMenuItemSelected(@Action action: String, entry: GenreEntity): Boolean
 
-    fun onItemClicked(genre: Genre)
+    fun onItemClicked(genre: GenreEntity)
   }
 
-  class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-    val title: TextView by bindView(R.id.line_one)
-    val indicator: LinearLayout by bindView(R.id.ui_item_context_indicator)
-    val empty: String by lazy { string(R.string.empty) }
-  }
+  class ViewHolder(
+      itemView: View,
+      indicatorPressed: (view: View, position: Int) -> Unit,
+      pressed: (view: View, position: Int) -> Unit
+  ) : RecyclerView.ViewHolder(itemView) {
+    private val title: TextView by bindView(R.id.line_one)
+    private val indicator: ImageView by bindView(R.id.ui_item_context_indicator)
+    private val empty: String by lazy { string(R.string.empty) }
 
-  fun update(cursor: List<Genre>) {
-    data = cursor
-    notifyDataSetChanged()
+    init {
+      indicator.setOnClickListener { indicatorPressed(it, adapterPosition) }
+      itemView.setOnClickListener { pressed(it, adapterPosition) }
+    }
+
+    companion object {
+      fun create(
+          parent: ViewGroup,
+          indicatorPressed: (view: View, position: Int) -> Unit,
+          pressed: (view: View, position: Int) -> Unit
+      ): ViewHolder {
+        val inflater: LayoutInflater = LayoutInflater.from(parent.context)
+        val view = inflater.inflate(R.layout.listitem_single, parent, false)
+        return ViewHolder(view, indicatorPressed, pressed)
+      }
+    }
+
+    fun bindTo(genre: GenreEntity) {
+      title.text = if (genre.genre.isBlank()) empty else genre.genre
+    }
+
+    fun clear() {
+      title.text = ""
+    }
   }
 }

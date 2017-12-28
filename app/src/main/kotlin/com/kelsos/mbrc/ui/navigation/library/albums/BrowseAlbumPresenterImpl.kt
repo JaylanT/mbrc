@@ -1,6 +1,10 @@
 package com.kelsos.mbrc.ui.navigation.library.albums
 
-import com.kelsos.mbrc.content.library.albums.Album
+import android.arch.lifecycle.LiveData
+import android.arch.lifecycle.Observer
+import android.arch.paging.DataSource
+import android.arch.paging.PagedList
+import com.kelsos.mbrc.content.library.albums.AlbumEntity
 import com.kelsos.mbrc.content.library.albums.AlbumRepository
 import com.kelsos.mbrc.content.library.albums.Sorting
 import com.kelsos.mbrc.events.LibraryRefreshCompleteEvent
@@ -8,19 +12,36 @@ import com.kelsos.mbrc.events.bus.RxBus
 import com.kelsos.mbrc.mvp.BasePresenter
 import com.kelsos.mbrc.preferences.AlbumSortingStore
 import com.kelsos.mbrc.utilities.SchedulerProvider
-import io.reactivex.Single
+import com.kelsos.mbrc.utilities.paged
+import io.reactivex.rxkotlin.plusAssign
 import timber.log.Timber
 import javax.inject.Inject
 
 class BrowseAlbumPresenterImpl
-@Inject constructor(
+@Inject
+constructor(
     private val bus: RxBus,
     private val repository: AlbumRepository,
     private val albumSortingStore: AlbumSortingStore,
     private val schedulerProvider: SchedulerProvider
-) :
-    BasePresenter<BrowseAlbumView>(),
+) : BasePresenter<BrowseAlbumView>(),
     BrowseAlbumPresenter {
+
+  private lateinit var albums: LiveData<PagedList<AlbumEntity>>
+
+  private fun observeAlbums(it: DataSource.Factory<Int, AlbumEntity>) {
+
+    if (::albums.isInitialized) {
+      albums.removeObservers(this)
+    }
+
+    albums = it.paged()
+    albums.observe(this, Observer {
+      if (it != null) {
+        view().update(it)
+      }
+    })
+  }
 
   override fun attach(view: BrowseAlbumView) {
     super.attach(view)
@@ -34,13 +55,17 @@ class BrowseAlbumPresenterImpl
 
   override fun load() {
     view().showLoading()
-    addDisposable(repository.getAlbumsSorted().compose { schedule(it) }.subscribe({
-      view().update(it)
-      view().hideLoading()
-    }) {
-      Timber.v(it)
-      view().hideLoading()
-    })
+    disposables += repository.getAlbumsSorted()
+        .observeOn(schedulerProvider.main())
+        .subscribeOn(schedulerProvider.io())
+        .subscribe({
+          observeAlbums(it)
+          view().hideLoading()
+        }) {
+          Timber.v(it)
+          view().hideLoading()
+        }
+
   }
 
   override fun showSorting() {
@@ -56,17 +81,17 @@ class BrowseAlbumPresenterImpl
   }
 
   private fun loadSorted(sortingSelection: Long, ascending: Boolean) {
-    addDisposable(repository.getAlbumsSorted(sortingSelection, ascending)
-        .compose { schedule(it) }
+    disposables += repository.getAlbumsSorted(sortingSelection, ascending)
+        .observeOn(schedulerProvider.main())
+        .subscribeOn(schedulerProvider.io())
         .subscribe({
-          view().update(it)
+          observeAlbums(it)
           view().hideLoading()
         }) {
           Timber.v(it)
           view().hideLoading()
-        })
+        }
   }
-
 
   override fun sortBy(@Sorting.Fields selection: Long) {
     albumSortingStore.setSortingSelection(selection)
@@ -76,16 +101,16 @@ class BrowseAlbumPresenterImpl
 
   override fun reload() {
     view().showLoading()
-    addDisposable(repository.getAndSaveRemote().compose { schedule(it) }.subscribe({
-      view().update(it)
-      view().hideLoading()
-    }) {
-      Timber.v(it)
-      view().hideLoading()
-    })
+    disposables += repository.getAndSaveRemote()
+        .observeOn(schedulerProvider.main())
+        .subscribeOn(schedulerProvider.io())
+        .subscribe({
+          observeAlbums(it)
+          view().hideLoading()
+        }) {
+          Timber.v(it)
+          view().hideLoading()
+        }
 
   }
-
-  private fun schedule(it: Single<List<Album>>) = it.observeOn(schedulerProvider.main())
-      .subscribeOn(schedulerProvider.io())
 }
