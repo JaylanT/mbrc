@@ -100,7 +100,7 @@ constructor(
       Timber.v(it, "Failed to store path")
     }
 
-    playingTrackLiveDataProvider.update() {
+    playingTrackLiveDataProvider.update {
       copy(coverUrl = "")
     }
   }
