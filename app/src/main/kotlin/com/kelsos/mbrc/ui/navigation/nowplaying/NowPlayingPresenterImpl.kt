@@ -1,7 +1,6 @@
 package com.kelsos.mbrc.ui.navigation.nowplaying
 
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.Observer
 import androidx.paging.DataSource
 import androidx.paging.PagedList
 import com.kelsos.mbrc.content.activestatus.livedata.PlayingTrackLiveDataProvider
@@ -13,6 +12,7 @@ import com.kelsos.mbrc.networking.client.UserActionUseCase
 import com.kelsos.mbrc.networking.protocol.NowPlayingMoveRequest
 import com.kelsos.mbrc.networking.protocol.Protocol
 import com.kelsos.mbrc.utilities.AppRxSchedulers
+import com.kelsos.mbrc.utilities.nonNullObserver
 import com.kelsos.mbrc.utilities.paged
 import io.reactivex.rxkotlin.plusAssign
 import javax.inject.Inject
@@ -33,12 +33,9 @@ constructor(
       userActionUseCase.perform(UserAction(Protocol.NowPlayingListMove, data))
     }
 
-    playingTrackLiveDataProvider.get().observe(this, Observer {
-      if (it == null) {
-        return@Observer
-      }
+    playingTrackLiveDataProvider.observe(this) {
       view().trackChanged(it)
-    })
+    }
   }
 
   private lateinit var nowPlayingTracks: LiveData<PagedList<NowPlayingEntity>>
@@ -59,11 +56,9 @@ constructor(
 
   private fun onNowPlayingTracksLoaded(it: DataSource.Factory<Int, NowPlayingEntity>) {
     nowPlayingTracks = it.paged()
-    nowPlayingTracks.observe(this, Observer {
-      if (it != null) {
-        view().update(it)
-      }
-    })
+    nowPlayingTracks.nonNullObserver(this) {
+      view().update(it)
+    }
   }
 
   override fun load() {

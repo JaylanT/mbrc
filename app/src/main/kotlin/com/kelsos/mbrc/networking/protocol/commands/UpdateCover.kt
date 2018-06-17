@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat.JPEG
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.core.net.toUri
 import com.kelsos.mbrc.content.activestatus.livedata.PlayingTrackLiveDataProvider
 import com.kelsos.mbrc.content.nowplaying.cover.CoverApi
 import com.kelsos.mbrc.content.nowplaying.cover.CoverModel
@@ -20,7 +21,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 import io.reactivex.Single
-import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.launch
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -42,7 +43,7 @@ constructor(
 
   init {
     coverDir = File(context.filesDir, COVER_DIR)
-    async(appCoroutineDispatchers.disk) {
+    launch(appCoroutineDispatchers.disk) {
       playingTrackLiveDataProvider.update {
         copy(coverUrl = coverModel.coverPath)
       }
@@ -71,8 +72,9 @@ constructor(
     }.subscribeOn(rxSchedulers.disk).subscribe({
 
       playingTrackLiveDataProvider.update {
-        coverModel.coverPath = it.absolutePath
-        copy(coverUrl = it.absolutePath)
+        val coverUri = it.toUri().toString()
+        coverModel.coverPath = coverUri
+        copy(coverUrl = coverUri)
       }
       UpdateWidgets.updateCover(context, it.absolutePath)
     }, {
